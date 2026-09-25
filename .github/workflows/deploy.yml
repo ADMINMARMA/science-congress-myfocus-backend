@@ -18,9 +18,9 @@ jobs:
     timeout-minutes: 15
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: '22'
           cache: npm
@@ -31,12 +31,15 @@ jobs:
       - name: Build deployable backend
         run: npm run build
       - name: Deploy to Jino over FTPS
-        uses: SamKirkland/FTP-Deploy-Action@v4.3.6
+        uses: SamKirkland/FTP-Deploy-Action@v4.4.0
         with:
           server: ${{ secrets.JINO_FTP_SERVER }}
           username: ${{ secrets.JINO_FTP_USER }}
           password: ${{ secrets.JINO_FTP_PASSWORD }}
           protocol: ftps
+          timeout: 120000
           local-dir: ./dist/
           # This FTP account is rooted at /domains/_projects on Jino.
           server-dir: /science-congress-myfocus-backend.marma.pro/
+
+
