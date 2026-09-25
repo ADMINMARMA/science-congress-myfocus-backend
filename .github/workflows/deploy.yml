@@ -1,0 +1,41 @@
+name: Test and deploy backend to Jino
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-science-congress-myfocus-backend
+  cancel-in-progress: true
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Test
+        run: npm test
+      - name: Build deployable backend
+        run: npm run build
+      - name: Deploy to Jino over FTPS
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.6
+        with:
+          server: ${{ secrets.JINO_FTP_SERVER }}
+          username: ${{ secrets.JINO_FTP_USER }}
+          password: ${{ secrets.JINO_FTP_PASSWORD }}
+          protocol: ftps
+          local-dir: ./dist/
+          server-dir: /domains/_projects/science-congress-myfocus-backend.marma.pro/
