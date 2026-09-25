@@ -1,4 +1,4 @@
-import { cp, mkdir, rm } from 'node:fs/promises';
+import { cp, mkdir, rm, writeFile } from 'node:fs/promises';
 import { build } from 'esbuild';
 
 await rm('dist', { recursive: true, force: true });
@@ -8,8 +8,9 @@ await build({
   outfile: 'dist/app.js',
   bundle: true,
   platform: 'node',
-  format: 'esm',
+  format: 'cjs',
   target: 'node22',
   sourcemap: true,
 });
 await cp('data/myFocus.xlsx', 'dist/data/myFocus.xlsx');
+await writeFile('dist/package.json', '{"type":"commonjs"}\n');

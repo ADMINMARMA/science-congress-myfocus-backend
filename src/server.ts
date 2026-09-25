@@ -1,10 +1,10 @@
 import { createServer, type ServerResponse } from 'node:http';
-import { fileURLToPath } from 'node:url';
+import { resolve } from 'node:path';
 import { TableCache } from './table-cache.js';
 
 const cache = new TableCache(
-  fileURLToPath(new URL('../data/myFocus.xlsx', import.meta.url)),
-  fileURLToPath(new URL('../.cache/table.json', import.meta.url)),
+  resolve(process.cwd(), 'data/myFocus.xlsx'),
+  resolve(process.cwd(), '.cache/table.json'),
 );
 const port = Number(process.env.PORT ?? process.env.TABLE_PORT ?? 3001);
 const productionOrigins = (process.env.CORS_ORIGINS ?? 'https://science-congress-myfocus-test.marma.pro')
