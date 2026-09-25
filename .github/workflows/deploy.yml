@@ -38,4 +38,5 @@ jobs:
           password: ${{ secrets.JINO_FTP_PASSWORD }}
           protocol: ftps
           local-dir: ./dist/
-          server-dir: /domains/_projects/science-congress-myfocus-backend.marma.pro/
+          # This FTP account is rooted at /domains/_projects on Jino.
+          server-dir: /science-congress-myfocus-backend.marma.pro/
