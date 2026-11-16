@@ -31,6 +31,8 @@ jobs:
       - name: Build deployable backend
         run: npm run build
       - name: Deploy to Jino over FTPS
+        id: deploy_first
+        continue-on-error: true
         uses: SamKirkland/FTP-Deploy-Action@v4.4.0
         with:
           # Jino's site domain accepts FTPS; the generic FTP host times out.
@@ -38,9 +40,41 @@ jobs:
           username: ${{ secrets.JINO_FTP_USER }}
           password: ${{ secrets.JINO_FTP_PASSWORD }}
           protocol: ftps
-          timeout: 120000
+          timeout: 60000
           local-dir: ./dist/
           # This FTP account is rooted at /domains/_projects on Jino.
           server-dir: /science-congress-myfocus-backend.marma.pro/
+      - name: Retry Jino FTPS deployment
+        id: deploy_second
+        if: steps.deploy_first.outcome == 'failure'
+        continue-on-error: true
+        uses: SamKirkland/FTP-Deploy-Action@v4.4.0
+        with:
+          server: science-congress-myfocus-backend.marma.pro
+          username: ${{ secrets.JINO_FTP_USER }}
+          password: ${{ secrets.JINO_FTP_PASSWORD }}
+          protocol: ftps
+          timeout: 60000
+          local-dir: ./dist/
+          server-dir: /science-congress-myfocus-backend.marma.pro/
+      - name: Final Jino FTPS attempt
+        id: deploy_third
+        if: steps.deploy_first.outcome == 'failure' && steps.deploy_second.outcome == 'failure'
+        continue-on-error: true
+        uses: SamKirkland/FTP-Deploy-Action@v4.4.0
+        with:
+          server: science-congress-myfocus-backend.marma.pro
+          username: ${{ secrets.JINO_FTP_USER }}
+          password: ${{ secrets.JINO_FTP_PASSWORD }}
+          protocol: ftps
+          timeout: 60000
+          local-dir: ./dist/
+          server-dir: /science-congress-myfocus-backend.marma.pro/
+      - name: Confirm backend deployment
+        if: always()
+        run: |
+          test "${{ steps.deploy_first.outcome }}" = success ||
+          test "${{ steps.deploy_second.outcome }}" = success ||
+          test "${{ steps.deploy_third.outcome }}" = success
 
 
