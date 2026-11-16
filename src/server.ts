@@ -38,7 +38,7 @@ function cors(res: ServerResponse, origin: string | null): void {
   if (!origin) return;
   res.setHeader('Access-Control-Allow-Origin', origin);
   res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'If-None-Match, Content-Type');
+  res.setHeader('Access-Control-Allow-Headers', 'If-None-Match, Content-Type, Cache-Control, Pragma');
   res.setHeader('Access-Control-Expose-Headers', 'ETag, X-Table-Cache');
   res.setHeader('Vary', 'Origin');
 }
