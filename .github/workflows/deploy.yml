@@ -33,7 +33,8 @@ jobs:
       - name: Deploy to Jino over FTPS
         uses: SamKirkland/FTP-Deploy-Action@v4.4.0
         with:
-          server: ${{ secrets.JINO_FTP_SERVER }}
+          # Jino's site domain accepts FTPS; the generic FTP host times out.
+          server: science-congress-myfocus-backend.marma.pro
           username: ${{ secrets.JINO_FTP_USER }}
           password: ${{ secrets.JINO_FTP_PASSWORD }}
           protocol: ftps
