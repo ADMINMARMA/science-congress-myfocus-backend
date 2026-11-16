@@ -7,16 +7,20 @@ const cache = new TableCache(
   resolve(process.cwd(), '.cache/table.json'),
 );
 const port = Number(process.env.PORT ?? process.env.TABLE_PORT ?? 3001);
-const productionOrigins = (process.env.CORS_ORIGINS ?? 'https://science-congress-myfocus-test.marma.pro')
-  .split(',')
-  .map((value) => value.trim())
-  .filter(Boolean);
+const productionOrigins = new Set([
+  'https://science-congress-myfocus-test.marma.pro',
+  'https://science-congress-myfocus-app.marma.pro',
+  ...(process.env.CORS_ORIGINS ?? '')
+    .split(',')
+    .map((value) => value.trim())
+    .filter(Boolean),
+]);
 const localhostPorts = new Set(
   (process.env.LOCALHOST_CORS_PORTS ?? '5173,5177').split(',').map((value) => value.trim()),
 );
 function allowedOrigin(value: string | undefined): string | null {
   if (!value) return null;
-  if (productionOrigins.includes(value)) return value;
+  if (productionOrigins.has(value)) return value;
   try {
     const url = new URL(value);
     if (

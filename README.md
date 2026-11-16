@@ -17,3 +17,7 @@ The production build creates a self-contained `dist/app.js` and copies the workb
 `dist/data/myFocus.xlsx`. Every push to `main` deploys `dist/` to Jino over FTPS. The Jino Node
 application entry point is `app.js` because the deployed directory itself contains the contents of
 `dist/`.
+
+The API allows requests from the test site and the KMU app site
+(`science-congress-myfocus-test.marma.pro` and `science-congress-myfocus-app.marma.pro`).
+`CORS_ORIGINS` can add further origins without removing these two.
