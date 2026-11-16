@@ -14,3 +14,6 @@ await build({
 });
 await cp('data/myFocus.xlsx', 'dist/data/myFocus.xlsx');
 await writeFile('dist/package.json', '{"type":"commonjs"}\n');
+// Passenger watches this file and restarts the Node app after FTPS uploads a new build.
+await mkdir('dist/tmp', { recursive: true });
+await writeFile('dist/tmp/restart.txt', `${new Date().toISOString()}\n`);

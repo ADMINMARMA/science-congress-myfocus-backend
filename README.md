@@ -21,3 +21,4 @@ application entry point is `app.js` because the deployed directory itself contai
 The API allows requests from the test site and the KMU app site
 (`science-congress-myfocus-test.marma.pro` and `science-congress-myfocus-app.marma.pro`).
 `CORS_ORIGINS` can add further origins without removing these two.
+The build also uploads `tmp/restart.txt` to request a Passenger restart after deployment.
