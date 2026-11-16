@@ -35,8 +35,8 @@ jobs:
         continue-on-error: true
         uses: SamKirkland/FTP-Deploy-Action@v4.4.0
         with:
-          # Jino's site domain accepts FTPS; the generic FTP host times out.
-          server: science-congress-myfocus-backend.marma.pro
+          # Use the FTP host shown in this Jino account's file-access settings.
+          server: j59536815.myjino.ru
           username: ${{ secrets.JINO_FTP_USER }}
           password: ${{ secrets.JINO_FTP_PASSWORD }}
           protocol: ftps
@@ -50,7 +50,7 @@ jobs:
         continue-on-error: true
         uses: SamKirkland/FTP-Deploy-Action@v4.4.0
         with:
-          server: science-congress-myfocus-backend.marma.pro
+          server: j59536815.myjino.ru
           username: ${{ secrets.JINO_FTP_USER }}
           password: ${{ secrets.JINO_FTP_PASSWORD }}
           protocol: ftps
@@ -63,7 +63,7 @@ jobs:
         continue-on-error: true
         uses: SamKirkland/FTP-Deploy-Action@v4.4.0
         with:
-          server: science-congress-myfocus-backend.marma.pro
+          server: j59536815.myjino.ru
           username: ${{ secrets.JINO_FTP_USER }}
           password: ${{ secrets.JINO_FTP_PASSWORD }}
           protocol: ftps
