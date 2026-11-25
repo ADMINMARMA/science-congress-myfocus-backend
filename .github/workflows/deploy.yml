@@ -14,8 +14,15 @@ concurrency:
 
 jobs:
   build-and-deploy:
-    runs-on: ubuntu-latest
+    runs-on: windows-latest
     timeout-minutes: 15
+    env:
+      BACKEND_UPLOAD_EXCLUDE: |
+        **/.git*
+        **/.git*/**
+        **/node_modules/**
+        tmp
+        tmp/**
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
@@ -44,6 +51,7 @@ jobs:
           local-dir: ./dist/
           # This FTP account is rooted at /domains/_projects on Jino.
           server-dir: /science-congress-myfocus-backend.marma.pro/
+          exclude: ${{ env.BACKEND_UPLOAD_EXCLUDE }}
       - name: Retry Jino FTPS deployment
         id: deploy_second
         if: steps.deploy_first.outcome == 'failure'
@@ -57,6 +65,7 @@ jobs:
           timeout: 60000
           local-dir: ./dist/
           server-dir: /science-congress-myfocus-backend.marma.pro/
+          exclude: ${{ env.BACKEND_UPLOAD_EXCLUDE }}
       - name: Final Jino FTPS attempt
         id: deploy_third
         if: steps.deploy_first.outcome == 'failure' && steps.deploy_second.outcome == 'failure'
@@ -70,11 +79,54 @@ jobs:
           timeout: 60000
           local-dir: ./dist/
           server-dir: /science-congress-myfocus-backend.marma.pro/
+          exclude: ${{ env.BACKEND_UPLOAD_EXCLUDE }}
       - name: Confirm backend deployment
         if: always()
+        shell: bash
         run: |
           test "${{ steps.deploy_first.outcome }}" = success ||
           test "${{ steps.deploy_second.outcome }}" = success ||
           test "${{ steps.deploy_third.outcome }}" = success
-
-
+      - name: Prepare Passenger restart after the backend upload
+        run: >-
+          node --input-type=module -e "import { mkdir, writeFile } from 'node:fs/promises';
+          await mkdir('dist/tmp', { recursive: true });
+          await writeFile('dist/tmp/restart.txt', new Date().toISOString() + '\n');"
+      - name: Restart the Jino backend over FTPS
+        uses: SamKirkland/FTP-Deploy-Action@v4.4.0
+        with:
+          server: j59536815.myjino.ru
+          username: ${{ secrets.JINO_FTP_USER }}
+          password: ${{ secrets.JINO_FTP_PASSWORD }}
+          protocol: ftps
+          timeout: 120000
+          local-dir: ./dist/tmp/
+          server-dir: /science-congress-myfocus-backend.marma.pro/tmp/
+      - name: Verify the restarted backend
+        shell: bash
+        run: |
+          node --input-type=module <<'NODE'
+          import { setTimeout as delay } from 'node:timers/promises';
+          const backend = 'https://science-congress-myfocus-backend.marma.pro';
+          const origins = ['app', 'test'].map((name) => `https://science-congress-myfocus-${name}.marma.pro`);
+          async function check(path, type, statuses, origin) {
+            const response = await fetch(backend + path, {
+              signal: AbortSignal.timeout(5000),
+              headers: { 'Cache-Control': 'no-cache', ...(origin ? { Origin: origin } : {}) },
+            });
+            await response.body?.cancel();
+            return statuses.includes(response.status) &&
+              response.headers.get('Content-Type')?.includes(type) &&
+              (!origin || response.headers.get('Access-Control-Allow-Origin') === origin);
+          }
+          for (let attempt = 0; attempt < 12; attempt++) {
+            const probes = [check('/health', 'application/json', [200]), check('/table', 'application/json', [200]),
+              ...origins.map((origin) => check('/expoforum-stands', 'application/json', [200, 503], origin))];
+            if ((await Promise.all(probes).catch(() => [])).filter(Boolean).length === probes.length) {
+              console.log('Verified the legacy table and ExpoForum stand endpoints on Jino.');
+              process.exit(0);
+            }
+            if (attempt < 11) await delay(5000);
+          }
+          throw new Error('The Jino backend did not pick up the deployed endpoint or its CORS settings.');
+          NODE

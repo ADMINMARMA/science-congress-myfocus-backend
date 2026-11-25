@@ -1,10 +1,16 @@
 import { createServer, type ServerResponse } from 'node:http';
 import { resolve } from 'node:path';
+import { createExpoforumStandsHandler } from './expoforum-stands.js';
+import { expoforumStandsTokenSha256 } from './expoforum-stands-settings.js';
 import { TableCache } from './table-cache.js';
 
 const cache = new TableCache(
   resolve(process.cwd(), 'data/myFocus.xlsx'),
   resolve(process.cwd(), '.cache/table.json'),
+);
+const expoforumStands = createExpoforumStandsHandler(
+  resolve(process.cwd(), '.cache/expoforum-stands.json'),
+  (process.env.EXPOFORUM_STANDS_TOKEN_SHA256 ?? expoforumStandsTokenSha256).trim(),
 );
 const port = Number(process.env.PORT ?? process.env.TABLE_PORT ?? 3001);
 const productionOrigins = new Set([
@@ -51,6 +57,10 @@ const server = createServer(async (req, res) => {
     return;
   }
   const url = new URL(req.url ?? '/', 'http://localhost');
+  if (url.pathname === '/expoforum-stands') {
+    await expoforumStands(req, res);
+    return;
+  }
   if (req.method !== 'GET') {
     res.writeHead(405, { Allow: 'GET, OPTIONS' }).end();
     return;
