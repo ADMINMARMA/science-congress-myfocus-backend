@@ -108,7 +108,11 @@ jobs:
           node --input-type=module <<'NODE'
           import { setTimeout as delay } from 'node:timers/promises';
           const backend = 'https://science-congress-myfocus-backend.marma.pro';
-          const origins = ['app', 'test'].map((name) => `https://science-congress-myfocus-${name}.marma.pro`);
+          const origins = [
+            'https://science-congress-myfocus-app.marma.pro',
+            'https://science-congress-myfocus-test.marma.pro',
+            'https://science-congress-myfocus.marma.pro',
+          ];
           async function check(path, type, statuses, origin) {
             const response = await fetch(backend + path, {
               signal: AbortSignal.timeout(5000),

@@ -13,6 +13,7 @@ const expoforumStands = createExpoforumStandsHandler(
   (process.env.EXPOFORUM_STANDS_TOKEN_SHA256 ?? expoforumStandsTokenSha256).trim(),
 );
 const port = Number(process.env.PORT ?? process.env.TABLE_PORT ?? 3001);
+const canonicalOrigin = 'https://science-congress-myfocus.marma.pro';
 const productionOrigins = new Set([
   'https://science-congress-myfocus-test.marma.pro',
   'https://science-congress-myfocus-app.marma.pro',
@@ -49,14 +50,20 @@ function cors(res: ServerResponse, origin: string | null): void {
   res.setHeader('Vary', 'Origin');
 }
 
-const server = createServer(async (req, res) => {
-  const origin = allowedOrigin(req.headers.origin);
+export const server = createServer(async (req, res) => {
+  const url = new URL(req.url ?? '/', 'http://localhost');
+  const standRead =
+    url.pathname === '/expoforum-stands' &&
+    (req.method === 'GET' ||
+      (req.method === 'OPTIONS' && (req.headers['access-control-request-method'] ?? 'GET') === 'GET'));
+  const origin =
+    allowedOrigin(req.headers.origin) ??
+    (standRead && req.headers.origin === canonicalOrigin ? canonicalOrigin : null);
   cors(res, origin);
   if (req.method === 'OPTIONS') {
     res.writeHead(origin ? 204 : 403).end();
     return;
   }
-  const url = new URL(req.url ?? '/', 'http://localhost');
   if (url.pathname === '/expoforum-stands') {
     await expoforumStands(req, res);
     return;
