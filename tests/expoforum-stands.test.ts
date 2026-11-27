@@ -79,6 +79,10 @@ test('only authorized, complete stand projections replace the last saved respons
       { stands: [{ id: 's1', name: { en: 'x'.repeat(501) } }, ...remaining] },
       { stands: [{ id: 's1', description: { en: 'x'.repeat(20_001) } }, ...remaining] },
       { stands: [{ id: 's1', description: { en: 7 } }, ...remaining] },
+      { stands: [{ id: 's1', field: 7 }, ...remaining] },
+      { stands: [{ id: 's1', services: [''] }, ...remaining] },
+      { stands: [{ id: 's1', programs: ['x'.repeat(501)] }, ...remaining] },
+      { stands: [{ id: 's1', editorialEnglish: ['private'] }, ...remaining] },
     ])
       assert.equal((await post(malformed)).status, 400);
     const oversized = await new Promise<number | undefined>((resolve, reject) => {
@@ -129,6 +133,55 @@ test('only authorized, complete stand projections replace the last saved respons
       assert.equal(afterRestart.headers.get('ETag'), etag);
       assert.deepEqual(await afterRestart.json(), expected);
 
+      assert.equal(
+        (
+          await post({
+            stands: [
+              {
+                id: 's1',
+                field: ' Тематическое пространство ',
+                programs: [],
+                services: ['Лекции', ' Интерактив ', 'Лекции'],
+                description: { en: 'Approved copy' },
+                editorialEnglish: ['description'],
+              },
+              ...remaining,
+            ],
+          })
+        ).status,
+        204,
+      );
+      assert.equal(
+        (
+          await post({
+            stands: [
+              {
+                id: 's1',
+                description: {
+                  en: 'Загрузка... (Loading data…)',
+                  fa: '#ERROR!',
+                  ru: 'Новый текст',
+                },
+              },
+              ...remaining,
+            ],
+          })
+        ).status,
+        204,
+      );
+      const recalculating = (await (await fetch(restarted.url)).json()) as {
+        stands: Record<string, unknown>[];
+      };
+      assert.deepEqual(recalculating.stands[0], {
+        id: 's1',
+        name: { ru: 'Название', fa: 'نام' },
+        field: 'Тематическое пространство',
+        programs: [],
+        services: ['Лекции', 'Интерактив'],
+        description: { ru: 'Новый текст', en: 'Approved copy' },
+        editorialEnglish: ['description'],
+      });
+
       const translated = 'Т'.repeat(7353);
       const update = {
         stands: stands.map(({ id }, i) => ({
@@ -145,7 +198,12 @@ test('only authorized, complete stand projections replace the last saved respons
       assert.notEqual(current.headers.get('ETag'), etag);
       assert.deepEqual(((await current.json()) as typeof update).stands[0], {
         id: 's1',
-        description: { ru: '' },
+        name: { ru: 'Название', fa: 'نام' },
+        field: 'Тематическое пространство',
+        programs: [],
+        services: ['Лекции', 'Интерактив'],
+        editorialEnglish: ['description'],
+        description: { ru: '', en: 'Approved copy' },
         menu: { ru: '' },
       });
     } finally {

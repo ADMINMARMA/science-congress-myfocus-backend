@@ -28,7 +28,10 @@ The API allows requests from the test site and the KMU app site
 The private Google Sheet's bound Apps Script sends `POST /expoforum-stands` with
 `Content-Type: application/json` and an `Authorization: Bearer` header. The server accepts
 only a complete visitor projection of stand IDs `s1`–`s49` with optional localized `name`,
-`shortName`, `description`, and `menu`. Include an ID-only entry where a stand has no text yet.
+`shortName`, `description`, and `menu`, plus optional `field` (string or null),
+`programs`/`services` (arrays of nonempty filter values), and `editorialEnglish`
+(names of text fields explicitly approved in the editor columns). Include an ID-only
+entry where a stand has no text yet. Unknown fields, locales and IDs are rejected.
 
 Set the SHA-256 of the bearer token in `EXPOFORUM_STANDS_TOKEN_SHA256` on the server or in
 `src/expoforum-stands-settings.ts` before building. Keep the original token in Apps Script's
@@ -38,3 +41,8 @@ script properties. The Jino process needs write access to its existing `.cache` 
 the first successful push. Invalid pushes preserve the last accepted projection on disk.
 Successful reads carry an ETag and support gzip. An explicit empty description or menu removes
 the corresponding text on the map.
+
+Missing translations, loading placeholders and spreadsheet errors preserve the last
+accepted locale value on disk. Empty strings explicitly clear descriptions/menus;
+empty arrays clear programs/services. Deploy this API before upgrading the bound
+Apps Script sender so the new filter fields are accepted.

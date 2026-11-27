@@ -7,9 +7,13 @@ import { gzipSync } from 'node:zlib';
 const locales = ['ru', 'en', 'es', 'pt', 'cn', 'vi', 'ar', 'fa'] as const;
 type Locale = (typeof locales)[number];
 const fieldLimits = { name: 500, shortName: 500, description: 20_000, menu: 12_000 };
-type Stand = { id: string } & Partial<
-  Record<keyof typeof fieldLimits, Partial<Record<Locale, string>>>
->;
+type Stand = {
+  id: string;
+  field?: string | null;
+  programs?: string[];
+  services?: string[];
+  editorialEnglish?: (keyof typeof fieldLimits)[];
+} & Partial<Record<keyof typeof fieldLimits, Partial<Record<Locale, string>>>>;
 type Snapshot = { stands: Stand[] };
 const standIds = Array.from({ length: 49 }, (_, index) => `s${index + 1}`);
 const maxBytes = 4 * 1024 * 1024;
@@ -17,6 +21,17 @@ type CachedResponse = { fileVersion: string; json: string; etag: string; gzip: B
 
 class InvalidSnapshot extends Error {}
 class BodyTooLarge extends Error {}
+
+function pendingSpreadsheetText(value: string): boolean {
+  return (
+    /^(?:Загрузка[.\u2026]+(?:\s*\(Loading data[.\u2026]+\))?|Loading(?: data)?[.\u2026]+)$/i.test(
+      value.trim(),
+    ) ||
+    /^#(?:REF!|ERROR!|N\/A|VALUE!|NAME\?|NUM!|DIV\/0!|NULL!|ЗНАЧ!|ИМЯ\?|ЧИСЛО!|ДЕЛ\/0!|Н\/Д|ССЫЛКА!|ОШИБКА!)$/i.test(
+      value.trim(),
+    )
+  );
+}
 
 function record(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -37,10 +52,40 @@ function project(value: unknown): Snapshot {
       typeof row.id !== 'string' ||
       !standIds.includes(row.id) ||
       stands.has(row.id) ||
-      Object.keys(row).some((key) => key !== 'id' && !Object.hasOwn(fieldLimits, key))
+      Object.keys(row).some(
+        (key) =>
+          !['id', 'field', 'programs', 'services', 'editorialEnglish'].includes(key) &&
+          !Object.hasOwn(fieldLimits, key),
+      )
     )
       throw new InvalidSnapshot('Invalid or duplicate stand ID or unexpected stand fields.');
     const stand: Stand = { id: row.id };
+    if (row.field !== undefined) {
+      if (row.field !== null && (typeof row.field !== 'string' || row.field.length > 500))
+        throw new InvalidSnapshot('Invalid stand field.');
+      stand.field = typeof row.field === 'string' ? row.field.trim() || null : null;
+    }
+    for (const field of ['programs', 'services'] as const) {
+      const values = row[field];
+      if (values === undefined) continue;
+      if (
+        !Array.isArray(values) ||
+        values.length > 100 ||
+        values.some((value) => typeof value !== 'string' || !value.trim() || value.length > 500)
+      )
+        throw new InvalidSnapshot('Invalid stand filter values.');
+      stand[field] = [...new Set((values as string[]).map((value) => value.trim()))];
+    }
+    if (row.editorialEnglish !== undefined) {
+      if (
+        !Array.isArray(row.editorialEnglish) ||
+        row.editorialEnglish.some(
+          (field) => typeof field !== 'string' || !Object.hasOwn(fieldLimits, field),
+        )
+      )
+        throw new InvalidSnapshot('Invalid editorial English fields.');
+      stand.editorialEnglish = [...new Set(row.editorialEnglish)] as (keyof typeof fieldLimits)[];
+    }
     for (const field of Object.keys(fieldLimits) as (keyof typeof fieldLimits)[]) {
       const fieldValue = row[field];
       if (fieldValue == null) continue;
@@ -56,6 +101,7 @@ function project(value: unknown): Snapshot {
         if (typeof text !== 'string' || text.length > fieldLimits[field])
           throw new InvalidSnapshot('Invalid or oversized stand text.');
         const trimmed = text.trim();
+        if (pendingSpreadsheetText(trimmed)) continue;
         if (trimmed || field === 'description' || field === 'menu') translations[locale] = trimmed;
       }
       if (Object.keys(translations).length) stand[field] = translations;
@@ -63,6 +109,20 @@ function project(value: unknown): Snapshot {
     stands.set(stand.id, stand);
   }
   return { stands: standIds.map((id) => stands.get(id)!) };
+}
+
+/** A recalculating Sheets formula is omitted by project(), preserving saved copy. */
+function mergeProjection(previous: Snapshot, incoming: Snapshot): Snapshot {
+  return {
+    stands: incoming.stands.map((stand, index) => {
+      const saved = previous.stands[index]!;
+      const merged: Stand = { ...saved, ...stand };
+      for (const field of Object.keys(fieldLimits) as (keyof typeof fieldLimits)[]) {
+        if (saved[field] || stand[field]) merged[field] = { ...saved[field], ...stand[field] };
+      }
+      return merged;
+    }),
+  };
 }
 
 function bearerDigest(authorization: string | undefined): Buffer | undefined {
@@ -193,7 +253,11 @@ export function createExpoforumStandsHandler(cacheFile: string, tokenSha256: str
       return;
     }
     try {
-      const data = project(await readBody(req));
+      let data = project(await readBody(req));
+      const previous = await readFile(cacheFile, 'utf8')
+        .then((contents) => project(JSON.parse(contents)))
+        .catch(() => undefined);
+      if (previous) data = mergeProjection(previous, data);
       await replaceFile(cacheFile, JSON.stringify(data));
       res.writeHead(204).end();
     } catch (error) {
